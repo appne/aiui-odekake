@@ -326,7 +326,7 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 """
 
 SHELL_FIELDS = """  data: {
-    build: 'odk-b3',
+    build: 'odk-b4',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
@@ -342,6 +342,7 @@ SHELL_FIELDS = """  data: {
   _tapLockUntil: 0,
   _lastTapAt: 0,
   _tapSnap: null,
+  _exitArmUntil: 0,
   _lastReloadAt: 0,
   _lastInteractAt: 0,
   // Scroll position of the page's <scroll-view>. syncDisplay
@@ -567,15 +568,24 @@ SHELL_METHODS = """  // ---- odekake shell ----
     const code = event && event.code;
     const kc = event && (typeof event.keyCode === 'number' ? event.keyCode
       : (typeof event.which === 'number' ? event.which : -1));
-    // DEBUG keys (user suggestion 2026-11-17): a letter key
+    // DEBUG keys (user suggestion 2026-11-17): a dedicated key
     // switches the mode directly, without the tap->swipe
     // sequence, so the agent can be driven during development
     // verification (the bridge daemon's send_key cadence of
-    // ~5 s cannot fit the 3 s tap->swipe window). 'a' (scan 30)
-    // = next mode, 's' (scan 31) = previous mode. No effect on
-    // normal wearer operation (no keyboard attached).
+    // ~5 s cannot fit the 3 s tap->swipe window). odk-b3 tried
+    // letter keys (scan 30/31): they never reached the page —
+    // the touchpad device's key layout has no letter codes, so
+    // EventHub drops them. odk-b4 therefore uses codes the
+    // touchpad provably emits as framework KeyEvents (measured
+    // in the picker's key log 2026-11-14): DPAD_RIGHT (scan
+    // 106) = next mode, DPAD_LEFT (scan 105) = previous mode;
+    // the letter forms stay for a real BT keyboard. NOTIFICA-
+    // TION (scan 204, kc 83) arms a 30 s BACK pass-through so
+    // daemon BACKs (also ~5 s apart) can walk the host exit
+    // sequence — the user's "exit shortcut" idea.
     const key = event && event.key;
-    if (code === 'KeyA' || key === 'a' || kc === 65) {
+    if (code === 'KeyA' || key === 'a' || kc === 65
+        || code === 'ArrowRight' || kc === 22) {
       event.preventDefault();
       this._lastInteractAt = Date.now();
       this._tapSnap = null;
@@ -583,12 +593,18 @@ SHELL_METHODS = """  // ---- odekake shell ----
       this.switchMode(1);
       return;
     }
-    if (code === 'KeyS' || key === 's' || kc === 83) {
+    if (code === 'KeyS' || key === 's'
+        || code === 'ArrowLeft' || kc === 21) {
       event.preventDefault();
       this._lastInteractAt = Date.now();
       this._tapSnap = null;
       this.clearTapArm();
       this.switchMode(-1);
+      return;
+    }
+    if (kc === 83) {
+      event.preventDefault();
+      this._exitArmUntil = Date.now() + 30000;
       return;
     }
     // BACK: reload the current mode (both engines in combo).
@@ -597,6 +613,9 @@ SHELL_METHODS = """  // ---- odekake shell ----
     // (zai-b40 / rdr-b12 rule, confirmed for odekake).
     if (code === 'Backspace' || code === 'Escape' || code === 'BrowserBack'
         || code === 'Back' || code === 'GoBack' || kc === 4 || kc === 27) {
+      // DEBUG exit arm (odk-b4): while armed, BACK is never
+      // consumed, so daemon-sent BACKs can walk the host exit.
+      if (Date.now() < (this._exitArmUntil || 0)) return;
       if (Date.now() - this._lastReloadAt < 3000
           || Date.now() - this._lastInteractAt < 3000) return;
       event.preventDefault();
