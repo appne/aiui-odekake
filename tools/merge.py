@@ -138,35 +138,19 @@ z_obj = must_replace(z_obj, "    this.setData({ center: c });",
 z_obj = must_replace(z_obj,
     "    const patch = {};\n"
     "    for (let k = 0; k < 14; k++) patch['L' + k] = lines[start + k] || '';\n"
-    "    // (zai-b41) The footer rides in the line flow. A text slot\n"
-    "    // that has once held content keeps its line height even after\n"
-    "    // being cleared to '' (kensho vrf-b32), so with the footer in\n"
-    "    // its own element below L0..L13, returning to a short display\n"
-    "    // (e.g. 'single') left the cleared slots' heights above the\n"
-    "    // footer and it sank. Instead, when the window has a spare\n"
-    "    // slot, the footer text goes into the first slot after the\n"
-    "    // real lines and the foot element stays ''. Only a full\n"
-    "    // window (14 real lines) uses the foot element, where no\n"
-    "    // cleared slot sits above it.\n"
-    "    const realCount = Math.min(14, lines.length - start);\n"
-    "    const footText = this.data.clock + ' ' + this.data.foot + ' ' + this.data.build;\n"
-    "    if (realCount < 14) {\n"
-    "      patch['L' + realCount] = footText;\n"
-    "      patch.footLine = '';\n"
-    "    } else {\n"
-    "      patch.footLine = footText;\n"
-    "    }\n"
+    "    // (zai-b42) The footer lives in its own .foot element\n"
+    "    // (15px, dim) at all times again. The zai-b41 in-flow\n"
+    "    // workaround is retired: '' slots now collapse through\n"
+    "    // the bound 'gone' class (kensho vrf-b35 proved a bound\n"
+    "    // class zeroing line-height/font-size/height collapses\n"
+    "    // a ''-retained slot), so cleared slots no longer hold\n"
+    "    // the footer down on short displays.\n"
+    "    for (let k = 0; k < 14; k++) patch['L' + k + 'c'] = patch['L' + k] ? 'line' : 'line gone';\n"
+    "    patch.footLine = this.data.clock + ' ' + this.data.foot + ' ' + this.data.build;\n"
     "    this.setData(patch);",
     "    this.zLines = [];\n"
     "    for (let k = 0; k < 14; k++) this.zLines.push(lines[start + k] || '');\n"
-    "    const realCount = Math.min(14, lines.length - start);\n"
-    "    const footText = this.zClockText + ' ' + this.zFootText + ' ' + this.data.build;\n"
-    "    if (realCount < 14) {\n"
-    "      this.zLines[realCount] = footText;\n"
-    "      this.zFootLine = '';\n"
-    "    } else {\n"
-    "      this.zFootLine = footText;\n"
-    "    }\n"
+    "    this.zFootLine = this.zClockText + ' ' + this.zFootText + ' ' + this.data.build;\n"
     "    this.syncDisplay();")
 # renderSingle returns its lines so the combo display can use the
 # raw (unwindowed) single-mode lines regardless of the zaisen mode.
@@ -326,7 +310,7 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 """
 
 SHELL_FIELDS = """  data: {
-    build: 'odk-b8',
+    build: 'odk-b9',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
@@ -416,14 +400,12 @@ SHELL_METHODS = """  // ---- odekake shell ----
     } else {
       patch.head = this.zHeadText;
       const rs = this.zRenderSingle(this.zParsedTrains());
-      // The footer rides in the line flow here too (zai-b41):
-      // into the first slot after the single lines when one is
-      // spare, else into the foot element.
+      // The footer sits in the .foot element (odk-b9, as in
+      // zai-b42); the '' slots below the single lines collapse
+      // via their bound classes, so nothing pushes it down.
       const footText = [this.zClockText, this.zFootText].filter(Boolean).join(' ');
-      let used = 0;
-      for (let k = 0; k < 14 && k < rs.lines.length; k++) { patch['L' + k] = rs.lines[k]; used++; }
-      if (used < 14) patch['L' + used] = footText;
-      else patch.foot = footText;
+      for (let k = 0; k < 14 && k < rs.lines.length; k++) patch['L' + k] = rs.lines[k];
+      patch.foot = footText;
       patch.status = this.rComboStatusText;
       patch.hint = 'タップ: 予測 / タップ→スワイプ: モード切替';
       patch.imgSrc = this.rComboImgSrc;

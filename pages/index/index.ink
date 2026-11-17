@@ -1089,14 +1089,7 @@ export default {
     while (start > 0 && lines[start].charAt(0) === '　') start--;
     this.zLines = [];
     for (let k = 0; k < 14; k++) this.zLines.push(lines[start + k] || '');
-    const realCount = Math.min(14, lines.length - start);
-    const footText = this.zClockText + ' ' + this.zFootText + ' ' + this.data.build;
-    if (realCount < 14) {
-      this.zLines[realCount] = footText;
-      this.zFootLine = '';
-    } else {
-      this.zFootLine = footText;
-    }
+    this.zFootLine = this.zClockText + ' ' + this.zFootText + ' ' + this.data.build;
     this.syncDisplay();
   },
   // (zai-b31) 'single' mode: the centred station, any trains stopped
@@ -1571,14 +1564,12 @@ export default {
     } else {
       patch.head = this.zHeadText;
       const rs = this.zRenderSingle(this.zParsedTrains());
-      // The footer rides in the line flow here too (zai-b41):
-      // into the first slot after the single lines when one is
-      // spare, else into the foot element.
+      // The footer sits in the .foot element (odk-b9, as in
+      // zai-b42); the '' slots below the single lines collapse
+      // via their bound classes, so nothing pushes it down.
       const footText = [this.zClockText, this.zFootText].filter(Boolean).join(' ');
-      let used = 0;
-      for (let k = 0; k < 14 && k < rs.lines.length; k++) { patch['L' + k] = rs.lines[k]; used++; }
-      if (used < 14) patch['L' + used] = footText;
-      else patch.foot = footText;
+      for (let k = 0; k < 14 && k < rs.lines.length; k++) patch['L' + k] = rs.lines[k];
+      patch.foot = footText;
       patch.status = this.rComboStatusText;
       patch.hint = 'タップ: 予測 / タップ→スワイプ: モード切替';
       patch.imgSrc = this.rComboImgSrc;

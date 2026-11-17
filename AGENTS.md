@@ -3,9 +3,9 @@
 Combined going-out agent for Rokid Glasses: zaisen (Keihan train
 positions) + rain radar in one page, built 2026-11-17 at the
 user's request. Voice launch name: "odekake".
-Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.7;
-package 39389b0b6c2647648ca84645f2aa0cae-1794931333350.aix,
-38.12 KB, odk-b7).
+Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.8;
+package 39389b0b6c2647648ca84645f2aa0cae-1794933632448.aix,
+38.38 KB, odk-b8).
 
 ## Modes
 
@@ -30,7 +30,11 @@ reloads the current mode).
 
 ## Build / maintenance
 
-- Current build: **odk-b8** (assembled from zai-b41 + rdr-b12).
+- Current build: **odk-b9** (assembled from zai-b42 + rdr-b12).
+  Footer restoration (odk-b9, porting zai-b42): the footer
+  sits in the .foot element (15px, dim) in combo and zaisen
+  modes; the zai-b41 in-flow routing is gone — '' slots
+  collapse via the odk-b8 class mechanism instead.
   Combo gap fix (odk-b8): syncDisplay binds a per-slot class
   (L0c..L13c, footc); '' slots get 'line gone' / 'foot gone'
   and collapse to zero height (kensho vrf-b35 proved a bound
