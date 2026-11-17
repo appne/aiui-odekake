@@ -30,7 +30,14 @@ reloads the current mode).
 
 ## Build / maintenance
 
-- Current build: **odk-b2** (assembled from zai-b41 + rdr-b12).
+- Current build: **odk-b3** (assembled from zai-b41 + rdr-b12).
+  odk-b3 adds DEBUG keys (user suggestion 2026-11-17): in
+  onKeyUp, 'a' (KeyA / keyCode 65) switches to the next mode
+  and 's' (83) to the previous, directly, without the
+  tap->swipe sequence — the bridge daemon's send_key cadence
+  (~5 s per token, measured 2026-11-17) cannot fit the 3 s
+  tap->swipe window, so development verification drives mode
+  switches with these keys (daemon scan 30 / 31).
 - The page is ASSEMBLED by `tools/merge.py` from
   `../aiui-zaisen/pages/index/index.ink` and
   `../aiui-radar/pages/index/index.ink`. Engine identifiers are

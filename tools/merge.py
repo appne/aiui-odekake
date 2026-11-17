@@ -326,7 +326,7 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 """
 
 SHELL_FIELDS = """  data: {
-    build: 'odk-b2',
+    build: 'odk-b3',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
@@ -567,6 +567,30 @@ SHELL_METHODS = """  // ---- odekake shell ----
     const code = event && event.code;
     const kc = event && (typeof event.keyCode === 'number' ? event.keyCode
       : (typeof event.which === 'number' ? event.which : -1));
+    // DEBUG keys (user suggestion 2026-11-17): a letter key
+    // switches the mode directly, without the tap->swipe
+    // sequence, so the agent can be driven during development
+    // verification (the bridge daemon's send_key cadence of
+    // ~5 s cannot fit the 3 s tap->swipe window). 'a' (scan 30)
+    // = next mode, 's' (scan 31) = previous mode. No effect on
+    // normal wearer operation (no keyboard attached).
+    const key = event && event.key;
+    if (code === 'KeyA' || key === 'a' || kc === 65) {
+      event.preventDefault();
+      this._lastInteractAt = Date.now();
+      this._tapSnap = null;
+      this.clearTapArm();
+      this.switchMode(1);
+      return;
+    }
+    if (code === 'KeyS' || key === 's' || kc === 83) {
+      event.preventDefault();
+      this._lastInteractAt = Date.now();
+      this._tapSnap = null;
+      this.clearTapArm();
+      this.switchMode(-1);
+      return;
+    }
     // BACK: reload the current mode (both engines in combo).
     // A press within 3 s of the last reload, tap or swipe is
     // left unconsumed so the OS exit sequence can proceed
