@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Assemble the odekake AIUI page from the zaisen (zai-b40) and
+"""Assemble the odekake AIUI page from the zaisen (zai-b41) and
 radar (rdr-b12) pages.
 
 Odekake is a combined agent: it embeds both engines in one page
@@ -138,9 +138,35 @@ z_obj = must_replace(z_obj, "    this.setData({ center: c });",
 z_obj = must_replace(z_obj,
     "    const patch = {};\n"
     "    for (let k = 0; k < 14; k++) patch['L' + k] = lines[start + k] || '';\n"
+    "    // (zai-b41) The footer rides in the line flow. A text slot\n"
+    "    // that has once held content keeps its line height even after\n"
+    "    // being cleared to '' (kensho vrf-b32), so with the footer in\n"
+    "    // its own element below L0..L13, returning to a short display\n"
+    "    // (e.g. 'single') left the cleared slots' heights above the\n"
+    "    // footer and it sank. Instead, when the window has a spare\n"
+    "    // slot, the footer text goes into the first slot after the\n"
+    "    // real lines and the foot element stays ''. Only a full\n"
+    "    // window (14 real lines) uses the foot element, where no\n"
+    "    // cleared slot sits above it.\n"
+    "    const realCount = Math.min(14, lines.length - start);\n"
+    "    const footText = this.data.clock + ' ' + this.data.foot + ' ' + this.data.build;\n"
+    "    if (realCount < 14) {\n"
+    "      patch['L' + realCount] = footText;\n"
+    "      patch.footLine = '';\n"
+    "    } else {\n"
+    "      patch.footLine = footText;\n"
+    "    }\n"
     "    this.setData(patch);",
     "    this.zLines = [];\n"
     "    for (let k = 0; k < 14; k++) this.zLines.push(lines[start + k] || '');\n"
+    "    const realCount = Math.min(14, lines.length - start);\n"
+    "    const footText = this.zClockText + ' ' + this.zFootText + ' ' + this.data.build;\n"
+    "    if (realCount < 14) {\n"
+    "      this.zLines[realCount] = footText;\n"
+    "      this.zFootLine = '';\n"
+    "    } else {\n"
+    "      this.zFootLine = footText;\n"
+    "    }\n"
     "    this.syncDisplay();")
 # renderSingle returns its lines so the combo display can use the
 # raw (unwindowed) single-mode lines regardless of the zaisen mode.
@@ -270,10 +296,11 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 // modes, switched by a tap followed within 3 s by a swipe:
 //   combo  (default): zaisen 'single' lines on top, the radar
 //          wide view below (home/here auto-switch as in radar);
-//          overflow scrolls with swipes. Tap cycles the radar
+//          overflow scrolls with swipes (the shell steps the
+//          scroll-view's scroll-top). Tap cycles the radar
 //          forecast 現在 -> +5 -> +10 -> +30 (no +60 here);
 //          BACK reloads both.
-//   zaisen: the zaisen agent (zai-b40) as-is.
+//   zaisen: the zaisen agent (zai-b41) as-is.
 //   radar:  the radar agent (rdr-b12) as-is.
 // A tap applies its mode-local action at once; if a swipe
 // follows within 3 s, the tap's effect is reverted and the
@@ -284,23 +311,30 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 // press within 3 s of the last reload or of the last tap/swipe
 // passes through (exit); otherwise it reloads the current
 // mode (both engines in combo).
-// ASSEMBLED by tools/merge.py from aiui-zaisen (zai-b40) and
+// ASSEMBLED by tools/merge.py from aiui-zaisen (zai-b41) and
 // aiui-radar (rdr-b12): engine identifiers are prefixed (z*/r*)
 // and their setData calls write display buffers that
 // syncDisplay() composes per mode. Port fixes by editing the
 // source agent and re-running the merge script.
 // odk-b1: first build.
+// odk-b2: the whole column lives in a <scroll-view> whose
+// scroll-top the shell drives (kensho vrf-b32/b33: no page
+// scroll APIs exist, and arrow keys never scroll the inner
+// view). A mode switch resets the scroll position (radar
+// mode scrolls straight to its status/hint/image block).
+// The zaisen footer rides in the line flow (zai-b41).
 """
 
 SHELL_FIELDS = """  data: {
-    build: 'odk-b1',
+    build: 'odk-b2',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
     foot: '',
     status: '読込中…',
     hint: '',
-    imgSrc: ''
+    imgSrc: '',
+    svTop: 0
   },
   // ---- odekake shell state ----
   _oMode: 'combo',
@@ -310,6 +344,16 @@ SHELL_FIELDS = """  data: {
   _tapSnap: null,
   _lastReloadAt: 0,
   _lastInteractAt: 0,
+  // Scroll position of the page's <scroll-view>. syncDisplay
+  // echoes it into data.svTop on every compose; only a mode
+  // switch or a combo swipe changes it. RADAR_TOP is the
+  // offset of the radar block (status element) inside the
+  // column: head (19+3) + 14 line slots (14*20) = 302; the
+  // foot element above it is '' in radar mode and may add up
+  // to ~20 px of retained height, which just shows as a
+  // small blank above the status line.
+  svTopVal: 0,
+  RADAR_TOP: 302,
   cFIdx: 0,
   rLastReqAtS: 0,
   // ---- display buffers (engines write, syncDisplay reads) ----
@@ -318,6 +362,7 @@ SHELL_FIELDS = """  data: {
   zFootText: '',
   zClockText: '--:--',
   zLines: [],
+  zFootLine: '',
   rStatusText: '読込中…',
   rHintText: 'タップ: 切替 / スワイプ: 時刻 / バック: 再読込',
   rImgSrc: '',
@@ -346,17 +391,19 @@ SHELL_METHODS = """  // ---- odekake shell ----
     if (this._tapTimer) { clearTimeout(this._tapTimer); this._tapTimer = null; }
   },
   // Compose the visible fields for the current odekake mode
-  // from the engine buffers. Layout is one column: head,
-  // zaisen lines, foot, radar status, hint, radar image. In
-  // zaisen mode the radar slots are '' and sit below the fold;
-  // in radar mode the zaisen slots are '' above the image.
+  // from the engine buffers. The whole column (head, zaisen
+  // lines, foot, radar status, hint, radar image) lives in
+  // one <scroll-view>; syncDisplay echoes the shell's scroll
+  // position (svTopVal) so engine updates never move the
+  // view. In radar mode svTopVal points at the radar block,
+  // so the '' zaisen slots above it are scrolled past.
   syncDisplay() {
-    const patch = { head: '', status: '', hint: '', imgSrc: '', foot: '' };
+    const patch = { head: '', status: '', hint: '', imgSrc: '', foot: '', svTop: this.svTopVal };
     for (let k = 0; k < 14; k++) patch['L' + k] = '';
     if (this._oMode === 'zaisen') {
       patch.head = this.zHeadText;
       for (let k = 0; k < 14; k++) patch['L' + k] = this.zLines[k] || '';
-      patch.foot = [this.zClockText, this.zFootText, this.data.build].filter(Boolean).join(' ');
+      patch.foot = this.zFootLine;
     } else if (this._oMode === 'radar') {
       patch.head = 'Radar ' + this.data.build;
       patch.status = this.rStatusText;
@@ -365,13 +412,28 @@ SHELL_METHODS = """  // ---- odekake shell ----
     } else {
       patch.head = this.zHeadText;
       const rs = this.zRenderSingle(this.zParsedTrains());
-      for (let k = 0; k < 14; k++) patch['L' + k] = rs.lines[k] || '';
-      patch.foot = [this.zClockText, this.zFootText].filter(Boolean).join(' ');
+      // The footer rides in the line flow here too (zai-b41):
+      // into the first slot after the single lines when one is
+      // spare, else into the foot element.
+      const footText = [this.zClockText, this.zFootText].filter(Boolean).join(' ');
+      let used = 0;
+      for (let k = 0; k < 14 && k < rs.lines.length; k++) { patch['L' + k] = rs.lines[k]; used++; }
+      if (used < 14) patch['L' + used] = footText;
+      else patch.foot = footText;
       patch.status = this.rComboStatusText;
       patch.hint = 'タップ: 予測 / タップ→スワイプ: モード切替';
       patch.imgSrc = this.rComboImgSrc;
     }
     this.setData(patch);
+  },
+  // Combo scrolling: step the scroll-view by 3 lines per
+  // swipe, clamped to the combo column's rough extent.
+  stepScroll(down) {
+    let v = this.svTopVal + (down ? 63 : -63);
+    if (v < 0) v = 0;
+    if (v > 320) v = 320;
+    this.svTopVal = v;
+    this.setData({ svTop: v });
   },
   rChanged() {
     this.rComboView();
@@ -455,6 +517,9 @@ SHELL_METHODS = """  // ---- odekake shell ----
     let i = order.indexOf(this._oMode);
     i = (i + dir + order.length) % order.length;
     this._oMode = order[i];
+    // Every mode starts from its top: combo/zaisen from the
+    // column head, radar from its status/hint/image block.
+    this.svTopVal = this._oMode === 'radar' ? this.RADAR_TOP : 0;
     this.enterMode();
     this.syncDisplay();
   },
@@ -557,8 +622,8 @@ SHELL_METHODS = """  // ---- odekake shell ----
       }
       this._lastInteractAt = Date.now();
       this.clearTapArm();
-      if (this._oMode === 'combo') return; // unconsumed: native scroll
       event.preventDefault();
+      if (this._oMode === 'combo') { this.stepScroll(down); return; }
       if (this._oMode === 'zaisen') this.zMove(down ? 1 : -1);
       else this.rStepTime(down ? -1 : 1);
       this.syncDisplay();
@@ -568,6 +633,7 @@ SHELL_METHODS = """  // ---- odekake shell ----
 
 TEMPLATE = """<page>
   <view class="container">
+    <scroll-view class="sv" scroll-y="true" scroll-top="{{ svTop }}">
     <text class="head">{{ head }}</text>
     <text class="line">{{ L0 }}</text>
     <text class="line">{{ L1 }}</text>
@@ -587,6 +653,7 @@ TEMPLATE = """<page>
     <text class="sub">{{ status }}</text>
     <text class="hint">{{ hint }}</text>
     <image class="radar" src="{{ imgSrc }}"></image>
+    </scroll-view>
   </view>
 </page>
 
@@ -598,6 +665,11 @@ TEMPLATE = """<page>
   justify-content: flex-start;
   height: 100vh;
   padding: 6px;
+}
+
+.sv {
+  width: 448px;
+  height: 338px;
 }
 
 .head {
