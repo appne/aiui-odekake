@@ -3,9 +3,9 @@
 Combined going-out agent for Rokid Glasses: zaisen (Keihan train
 positions) + rain radar in one page, built 2026-11-17 at the
 user's request. Voice launch name: "odekake".
-Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.3;
-package 39389b0b6c2647648ca84645f2aa0cae-1794925879176.aix,
-37.60 KB, odk-b3).
+Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.4;
+package 39389b0b6c2647648ca84645f2aa0cae-1794927159800.aix,
+38.00 KB, odk-b4).
 
 ## Modes
 
@@ -30,21 +30,26 @@ reloads the current mode).
 
 ## Build / maintenance
 
-- Current build: **odk-b4** (assembled from zai-b41 + rdr-b12).
-  DEBUG keys (user suggestion 2026-11-17): in onKeyUp, a
-  dedicated key switches the mode directly, without the
-  tap->swipe sequence — the bridge daemon's send_key cadence
-  (~5 s per token, measured 2026-11-17) cannot fit the 3 s
-  tap->swipe window, so development verification drives mode
-  switches with these keys. odk-b3's letter keys (scan 30/31)
-  never reached the page (the touchpad's key layout has no
-  letter codes; EventHub drops them), so odk-b4 uses DPAD_RIGHT
-  (scan 106, kc 22) = next mode and DPAD_LEFT (scan 105,
-  kc 21) = previous (codes the touchpad provably emits; the
-  letter forms remain for a BT keyboard). NOTIFICATION
-  (scan 204, kc 83) arms a 30 s BACK pass-through
-  (_exitArmUntil) so daemon BACKs can walk the host exit
-  sequence — the user's "exit shortcut" idea.
+- Current build: **odk-b5** (assembled from zai-b41 + rdr-b12).
+  DEBUG keys (user suggestion 2026-11-17): dedicated keys
+  drive the agent during development verification, because
+  the bridge daemon's send_key cadence (~5 s per token,
+  measured 2026-11-17) cannot fit the 3 s tap->swipe window.
+  History: odk-b3's letter keys (scan 30/31) never reached
+  the page (no letter codes in the touchpad key layout), and
+  scan 148/149 do not reach it either. odk-b4's plain
+  DPAD_RIGHT/LEFT reached it — but a physical temple swipe
+  ALSO delivers its raw macro keys (NOTIFICATION -> DPAD ->
+  DPAD) to the page, so physical swipes switched modes
+  (user-reported 2026-11-17). odk-b5 fingerprints the macro:
+  NOTIFICATION (kc 83) only stamps _macroAt; a DPAD within
+  1.5 s of it is physical and ignored; a LONE DPAD can only
+  come from the daemon — the "operation a human cannot do"
+  the user asked for. Triggers: lone DPAD_RIGHT (scan 106)
+  = next mode; lone DPAD_LEFT (scan 105) = arm a 30 s BACK
+  pass-through (_exitArmUntil) so daemon BACKs can walk the
+  host exit sequence (the user's "exit shortcut" idea);
+  BT keyboard: a = next, s = previous, x = exit arm.
 - The page is ASSEMBLED by `tools/merge.py` from
   `../aiui-zaisen/pages/index/index.ink` and
   `../aiui-radar/pages/index/index.ink`. Engine identifiers are

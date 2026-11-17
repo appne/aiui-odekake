@@ -270,6 +270,7 @@ export default {
   _lastTapAt: 0,
   _tapSnap: null,
   _exitArmUntil: 0,
+  _macroAt: 0,
   _lastReloadAt: 0,
   _lastInteractAt: 0,
   // Scroll position of the page's <scroll-view>. syncDisplay
@@ -1723,27 +1724,39 @@ export default {
     const code = event && event.code;
     const kc = event && (typeof event.keyCode === 'number' ? event.keyCode
       : (typeof event.which === 'number' ? event.which : -1));
-    // DEBUG keys (user suggestion 2026-11-17): a dedicated key
-    // switches the mode directly, without the tap->swipe
-    // sequence, so the agent can be driven during development
-    // verification (the bridge daemon's send_key cadence of
-    // ~5 s cannot fit the 3 s tap->swipe window). odk-b3 tried
-    // letter keys (scan 30/31): they never reached the page —
-    // the touchpad device's key layout has no letter codes, so
-    // EventHub drops them. odk-b4 therefore uses codes the
-    // touchpad provably emits as framework KeyEvents (measured
-    // in the picker's key log 2026-11-14): DPAD_RIGHT (scan
-    // 106) = next mode, DPAD_LEFT (scan 105) = previous mode;
-    // kc 186 (PROG_BLUE, scan 148) / kc 176 (SETTINGS, scan
-    // 149) are extra candidates a temple swipe can never
-    // produce. The letter forms stay for a real BT keyboard.
-    // NOTIFICA-
-    // TION (scan 204, kc 83) arms a 30 s BACK pass-through so
-    // daemon BACKs (also ~5 s apart) can walk the host exit
-    // sequence — the user's "exit shortcut" idea.
+    // DEBUG keys (user suggestion 2026-11-17): dedicated keys
+    // drive the agent during development verification, because
+    // the bridge daemon's send_key cadence (~5 s per token)
+    // cannot fit the 3 s tap->swipe window. History: odk-b3's
+    // letter keys (scan 30/31) never reached the page (no such
+    // codes in the touchpad key layout; EventHub drops them),
+    // and scan 148/149 (PROG_BLUE/SETTINGS) do not reach it
+    // either. odk-b4's plain DPAD_RIGHT/LEFT DID reach it —
+    // but a physical temple swipe also delivers its raw macro
+    // keys (NOTIFICATION -> DPAD -> DPAD) to the page, so
+    // physical swipes switched modes (user-reported). odk-b5
+    // therefore fingerprints the macro: a DPAD that follows a
+    // NOTIFICATION within 1.5 s is physical and is ignored;
+    // a lone DPAD can only come from the daemon (or a BT
+    // keyboard), which is the "operation a human cannot do"
+    // the user asked for. Triggers:
+    //   lone DPAD_RIGHT (scan 106) -> next mode
+    //   lone DPAD_LEFT  (scan 105) -> arm a 30 s BACK
+    //     pass-through so daemon BACKs can walk the host
+    //     exit sequence (the user's "exit shortcut" idea)
+    //   BT keyboard: a = next, s = previous, x = exit arm.
     const key = event && event.key;
-    if (code === 'KeyA' || key === 'a' || kc === 65
-        || code === 'ArrowRight' || kc === 22 || kc === 186) {
+    if (kc === 83) {
+      // NOTIFICATION: the head of every physical swipe macro.
+      // Just stamp it (no preventDefault — do not disturb the
+      // host's own gesture handling).
+      this._macroAt = Date.now();
+      return;
+    }
+    if (code === 'ArrowRight' || kc === 22 || kc === 186
+        || code === 'KeyA' || key === 'a' || kc === 65) {
+      if (Date.now() - (this._macroAt || 0) < 1500
+          && !(code === 'KeyA' || key === 'a' || kc === 65 || kc === 186)) return;
       event.preventDefault();
       this._lastInteractAt = Date.now();
       this._tapSnap = null;
@@ -1751,18 +1764,20 @@ export default {
       this.switchMode(1);
       return;
     }
-    if (code === 'KeyS' || key === 's'
-        || code === 'ArrowLeft' || kc === 21 || kc === 176) {
+    if (code === 'ArrowLeft' || kc === 21 || kc === 176
+        || code === 'KeyX' || key === 'x') {
+      if (Date.now() - (this._macroAt || 0) < 1500
+          && !(code === 'KeyX' || key === 'x' || kc === 176)) return;
+      event.preventDefault();
+      this._exitArmUntil = Date.now() + 30000;
+      return;
+    }
+    if (code === 'KeyS' || key === 's') {
       event.preventDefault();
       this._lastInteractAt = Date.now();
       this._tapSnap = null;
       this.clearTapArm();
       this.switchMode(-1);
-      return;
-    }
-    if (kc === 83) {
-      event.preventDefault();
-      this._exitArmUntil = Date.now() + 30000;
       return;
     }
     // BACK: reload the current mode (both engines in combo).
