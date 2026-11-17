@@ -1734,13 +1734,16 @@ export default {
     // touchpad provably emits as framework KeyEvents (measured
     // in the picker's key log 2026-11-14): DPAD_RIGHT (scan
     // 106) = next mode, DPAD_LEFT (scan 105) = previous mode;
-    // the letter forms stay for a real BT keyboard. NOTIFICA-
+    // kc 186 (PROG_BLUE, scan 148) / kc 176 (SETTINGS, scan
+    // 149) are extra candidates a temple swipe can never
+    // produce. The letter forms stay for a real BT keyboard.
+    // NOTIFICA-
     // TION (scan 204, kc 83) arms a 30 s BACK pass-through so
     // daemon BACKs (also ~5 s apart) can walk the host exit
     // sequence — the user's "exit shortcut" idea.
     const key = event && event.key;
     if (code === 'KeyA' || key === 'a' || kc === 65
-        || code === 'ArrowRight' || kc === 22) {
+        || code === 'ArrowRight' || kc === 22 || kc === 186) {
       event.preventDefault();
       this._lastInteractAt = Date.now();
       this._tapSnap = null;
@@ -1749,7 +1752,7 @@ export default {
       return;
     }
     if (code === 'KeyS' || key === 's'
-        || code === 'ArrowLeft' || kc === 21) {
+        || code === 'ArrowLeft' || kc === 21 || kc === 176) {
       event.preventDefault();
       this._lastInteractAt = Date.now();
       this._tapSnap = null;
