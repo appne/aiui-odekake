@@ -253,11 +253,16 @@ for (let si = 0; si < STATIONS.length; si++) STATION_IDX[STATIONS[si][0]] = si;
 
 export default {
   data: {
-    build: 'odk-b7',
+    build: 'odk-b8',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
+    L0c: 'line', L1c: 'line', L2c: 'line', L3c: 'line',
+    L4c: 'line', L5c: 'line', L6c: 'line', L7c: 'line',
+    L8c: 'line', L9c: 'line', L10c: 'line', L11c: 'line',
+    L12c: 'line', L13c: 'line',
     foot: '',
+    footc: 'foot',
     status: '読込中…',
     hint: '',
     imgSrc: '',
@@ -275,12 +280,11 @@ export default {
   // echoes it into data.svTop on every compose; only a mode
   // switch or a combo swipe changes it. RADAR_TOP is the
   // offset of the radar block (status element) inside the
-  // column: head (19+3) + 14 line slots (14*20) = 302; the
-  // foot element above it is '' in radar mode and may add up
-  // to ~20 px of retained height, which just shows as a
-  // small blank above the status line.
+  // column. Since odk-b8 the '' line slots collapse (bound
+  // 'gone' class), so the block sits right below the head:
+  // 19+3 = 22.
   svTopVal: 0,
-  RADAR_TOP: 302,
+  RADAR_TOP: 22,
   cFIdx: 0,
   rLastReqAtS: 0,
   // ---- display buffers (engines write, syncDisplay reads) ----
@@ -1579,6 +1583,12 @@ export default {
       patch.hint = 'タップ: 予測 / タップ→スワイプ: モード切替';
       patch.imgSrc = this.rComboImgSrc;
     }
+    // odk-b8: collapse every '' slot (and an '' foot) so its
+    // retained height cannot push the blocks below it down.
+    // Kensho vrf-b35 proved a bound class that zeroes
+    // line-height/font-size/height collapses a retained slot.
+    for (let k = 0; k < 14; k++) patch['L' + k + 'c'] = patch['L' + k] ? 'line' : 'line gone';
+    patch.footc = patch.foot ? 'foot' : 'foot gone';
     this.setData(patch);
   },
   // Combo scrolling: step the scroll-view by 3 lines per
@@ -1851,21 +1861,21 @@ export default {
   <view class="container">
     <scroll-view class="sv" scroll-y="true" scroll-top="{{ svTop }}">
     <text class="head">{{ head }}</text>
-    <text class="line">{{ L0 }}</text>
-    <text class="line">{{ L1 }}</text>
-    <text class="line">{{ L2 }}</text>
-    <text class="line">{{ L3 }}</text>
-    <text class="line">{{ L4 }}</text>
-    <text class="line">{{ L5 }}</text>
-    <text class="line">{{ L6 }}</text>
-    <text class="line">{{ L7 }}</text>
-    <text class="line">{{ L8 }}</text>
-    <text class="line">{{ L9 }}</text>
-    <text class="line">{{ L10 }}</text>
-    <text class="line">{{ L11 }}</text>
-    <text class="line">{{ L12 }}</text>
-    <text class="line">{{ L13 }}</text>
-    <text class="foot">{{ foot }}</text>
+    <text class="{{ L0c }}">{{ L0 }}</text>
+    <text class="{{ L1c }}">{{ L1 }}</text>
+    <text class="{{ L2c }}">{{ L2 }}</text>
+    <text class="{{ L3c }}">{{ L3 }}</text>
+    <text class="{{ L4c }}">{{ L4 }}</text>
+    <text class="{{ L5c }}">{{ L5 }}</text>
+    <text class="{{ L6c }}">{{ L6 }}</text>
+    <text class="{{ L7c }}">{{ L7 }}</text>
+    <text class="{{ L8c }}">{{ L8 }}</text>
+    <text class="{{ L9c }}">{{ L9 }}</text>
+    <text class="{{ L10c }}">{{ L10 }}</text>
+    <text class="{{ L11c }}">{{ L11 }}</text>
+    <text class="{{ L12c }}">{{ L12 }}</text>
+    <text class="{{ L13c }}">{{ L13 }}</text>
+    <text class="{{ footc }}">{{ foot }}</text>
     <text class="sub">{{ status }}</text>
     <text class="hint">{{ hint }}</text>
     <image class="radar" src="{{ imgSrc }}"></image>
@@ -1906,6 +1916,13 @@ export default {
   font-size: 15px;
   line-height: 17px;
   margin-top: 3px;
+}
+
+.gone {
+  line-height: 0px;
+  font-size: 0px;
+  height: 0px;
+  margin-top: 0px;
 }
 
 .sub {

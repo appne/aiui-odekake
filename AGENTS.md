@@ -3,9 +3,9 @@
 Combined going-out agent for Rokid Glasses: zaisen (Keihan train
 positions) + rain radar in one page, built 2026-11-17 at the
 user's request. Voice launch name: "odekake".
-Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.6;
-package 39389b0b6c2647648ca84645f2aa0cae-1794929907725.aix,
-37.90 KB, odk-b6).
+Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.7;
+package 39389b0b6c2647648ca84645f2aa0cae-1794931333350.aix,
+38.12 KB, odk-b7).
 
 ## Modes
 
@@ -30,7 +30,13 @@ reloads the current mode).
 
 ## Build / maintenance
 
-- Current build: **odk-b7** (assembled from zai-b41 + rdr-b12).
+- Current build: **odk-b8** (assembled from zai-b41 + rdr-b12).
+  Combo gap fix (odk-b8): syncDisplay binds a per-slot class
+  (L0c..L13c, footc); '' slots get 'line gone' / 'foot gone'
+  and collapse to zero height (kensho vrf-b35 proved a bound
+  class zeroing line-height/font-size/height collapses a
+  ''-retained slot). RADAR_TOP is 22 now (slots above the
+  radar block collapse). Verified pending.
   Tap-arm race fix (odk-b7, measured 2026-11-18): the tap
   timer fired 300 ms after GlobalHook unless an ArrowUp/
   Down keyUP cancelled it — but a long swipe's ArrowDown
