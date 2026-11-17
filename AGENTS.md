@@ -3,9 +3,9 @@
 Combined going-out agent for Rokid Glasses: zaisen (Keihan train
 positions) + rain radar in one page, built 2026-11-17 at the
 user's request. Voice launch name: "odekake".
-Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.5;
-package 39389b0b6c2647648ca84645f2aa0cae-1794927860872.aix,
-38.18 KB, odk-b5).
+Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.6;
+package 39389b0b6c2647648ca84645f2aa0cae-1794929907725.aix,
+37.90 KB, odk-b6).
 
 ## Modes
 
@@ -30,7 +30,19 @@ reloads the current mode).
 
 ## Build / maintenance
 
-- Current build: **odk-b6** (assembled from zai-b41 + rdr-b12).
+- Current build: **odk-b7** (assembled from zai-b41 + rdr-b12).
+  Tap-arm race fix (odk-b7, measured 2026-11-18): the tap
+  timer fired 300 ms after GlobalHook unless an ArrowUp/
+  Down keyUP cancelled it — but a long swipe's ArrowDown
+  keyUP lands past 300 ms (its horizontal ArrowRight
+  repeats stretch the sequence to ~450 ms), so the tap
+  fired mid-swipe and the late ArrowDown became a
+  tap->swipe mode switch (user-reported: long swipes
+  switched modes). Fix: any arrow keyDOWN cancels the tap
+  arm (onKeyDown), ArrowLeft/Right keyUPs also cancel it,
+  and the arm window is 500 ms. The same timer pattern
+  exists in standalone radar/zaisen (milder symptoms);
+  not yet ported there.
   DEBUG drive (user suggestion 2026-11-17): the daemon's
   send_key cadence (~5 s per token) cannot fit the 3 s
   tap->swipe window, so development verification switches

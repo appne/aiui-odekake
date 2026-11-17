@@ -326,7 +326,7 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 """
 
 SHELL_FIELDS = """  data: {
-    build: 'odk-b6',
+    build: 'odk-b7',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
@@ -580,6 +580,15 @@ SHELL_METHODS = """  // ---- odekake shell ----
   // over adb (am start SpriteMainActivity).
   onKeyDown(event) {
     const code = event && event.code;
+    if (code === 'ArrowUp' || code === 'ArrowDown'
+        || code === 'ArrowLeft' || code === 'ArrowRight') {
+      // A swipe's first arrow keyDOWN cancels the pending
+      // tap arm (odk-b7): a long swipe's ArrowDown keyUP can
+      // land past the tap window (its horizontal repeats
+      // stretch the sequence), but the first arrow keyDOWN
+      // arrives early — the tap must not fire for a swipe.
+      this.clearTapArm();
+    }
     if (code === 'Shortcut') {
       this._lastInteractAt = Date.now();
       this._tapSnap = null;
@@ -641,7 +650,7 @@ SHELL_METHODS = """  // ---- odekake shell ----
       event.preventDefault();
       if (Date.now() < this._tapLockUntil) return;
       if (this._tapTimer) return;
-      this._tapTimer = setTimeout(() => { this._tapTimer = null; this.fireTap(); }, 300);
+      this._tapTimer = setTimeout(() => { this._tapTimer = null; this.fireTap(); }, 500);
       return;
     }
     if (code === 'Enter') {
@@ -649,6 +658,13 @@ SHELL_METHODS = """  // ---- odekake shell ----
       if (Date.now() < this._tapLockUntil) return;
       this.clearTapArm();
       this.fireTap();
+      return;
+    }
+    if (code === 'ArrowLeft' || code === 'ArrowRight') {
+      // Horizontal swipe components: not page actions, but
+      // they prove a gesture is a swipe — cancel any pending
+      // tap arm (odk-b7, belt-and-braces with onKeyDown).
+      this.clearTapArm();
       return;
     }
     if (code === 'ArrowUp' || code === 'ArrowDown') {
