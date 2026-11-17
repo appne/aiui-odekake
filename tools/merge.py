@@ -326,7 +326,7 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 """
 
 SHELL_FIELDS = """  data: {
-    build: 'odk-b5',
+    build: 'odk-b6',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
@@ -342,8 +342,6 @@ SHELL_FIELDS = """  data: {
   _tapLockUntil: 0,
   _lastTapAt: 0,
   _tapSnap: null,
-  _exitArmUntil: 0,
-  _macroAt: 0,
   _lastReloadAt: 0,
   _lastInteractAt: 0,
   // Scroll position of the page's <scroll-view>. syncDisplay
@@ -565,56 +563,44 @@ SHELL_METHODS = """  // ---- odekake shell ----
       this.rPollHere();
     }
   },
+  // DEBUG drive (user suggestion 2026-11-17): the daemon's
+  // send_key cadence (~5 s per token) cannot fit the 3 s
+  // tap->swipe window, so development verification drives
+  // mode switches with a dedicated key. Measured facts
+  // (kensho vrf-b34 keylog, 2026-11-18): ink key events
+  // carry ONLY `code` (key / keyCode are always undefined);
+  // a physical temple swipe delivers GlobalHook, then
+  // ArrowRight/Left x1-2 and ArrowDown/Up x1 — the count
+  // varies, so count-based fingerprints are unreliable;
+  // daemon scan 149 (SETTINGS) delivers a 'Shortcut'
+  // keyDOWN only, which a temple swipe can never produce;
+  // scan 148 and letter scans deliver nothing. Hence:
+  // 'Shortcut' (onKeyDown) = next mode. Development exit
+  // needs no page support: the launcher is brought forward
+  // over adb (am start SpriteMainActivity).
+  onKeyDown(event) {
+    const code = event && event.code;
+    if (code === 'Shortcut') {
+      this._lastInteractAt = Date.now();
+      this._tapSnap = null;
+      this.clearTapArm();
+      this.switchMode(1);
+    }
+  },
   onKeyUp(event) {
     const code = event && event.code;
     const kc = event && (typeof event.keyCode === 'number' ? event.keyCode
       : (typeof event.which === 'number' ? event.which : -1));
-    // DEBUG keys (user suggestion 2026-11-17): dedicated keys
-    // drive the agent during development verification, because
-    // the bridge daemon's send_key cadence (~5 s per token)
-    // cannot fit the 3 s tap->swipe window. History: odk-b3's
-    // letter keys (scan 30/31) never reached the page (no such
-    // codes in the touchpad key layout; EventHub drops them),
-    // and scan 148/149 (PROG_BLUE/SETTINGS) do not reach it
-    // either. odk-b4's plain DPAD_RIGHT/LEFT DID reach it —
-    // but a physical temple swipe also delivers its raw macro
-    // keys (NOTIFICATION -> DPAD -> DPAD) to the page, so
-    // physical swipes switched modes (user-reported). odk-b5
-    // therefore fingerprints the macro: a DPAD that follows a
-    // NOTIFICATION within 1.5 s is physical and is ignored;
-    // a lone DPAD can only come from the daemon (or a BT
-    // keyboard), which is the "operation a human cannot do"
-    // the user asked for. Triggers:
-    //   lone DPAD_RIGHT (scan 106) -> next mode
-    //   lone DPAD_LEFT  (scan 105) -> arm a 30 s BACK
-    //     pass-through so daemon BACKs can walk the host
-    //     exit sequence (the user's "exit shortcut" idea)
-    //   BT keyboard: a = next, s = previous, x = exit arm.
+    // BT keyboard only: a = next mode, s = previous mode.
+    // (Daemon-sent letter scans never reach the page; the
+    // daemon drives via 'Shortcut' in onKeyDown instead.)
     const key = event && event.key;
-    if (kc === 83) {
-      // NOTIFICATION: the head of every physical swipe macro.
-      // Just stamp it (no preventDefault — do not disturb the
-      // host's own gesture handling).
-      this._macroAt = Date.now();
-      return;
-    }
-    if (code === 'ArrowRight' || kc === 22 || kc === 186
-        || code === 'KeyA' || key === 'a' || kc === 65) {
-      if (Date.now() - (this._macroAt || 0) < 1500
-          && !(code === 'KeyA' || key === 'a' || kc === 65 || kc === 186)) return;
+    if (code === 'KeyA' || key === 'a' || kc === 65) {
       event.preventDefault();
       this._lastInteractAt = Date.now();
       this._tapSnap = null;
       this.clearTapArm();
       this.switchMode(1);
-      return;
-    }
-    if (code === 'ArrowLeft' || kc === 21 || kc === 176
-        || code === 'KeyX' || key === 'x') {
-      if (Date.now() - (this._macroAt || 0) < 1500
-          && !(code === 'KeyX' || key === 'x' || kc === 176)) return;
-      event.preventDefault();
-      this._exitArmUntil = Date.now() + 30000;
       return;
     }
     if (code === 'KeyS' || key === 's') {
@@ -631,9 +617,6 @@ SHELL_METHODS = """  // ---- odekake shell ----
     // (zai-b40 / rdr-b12 rule, confirmed for odekake).
     if (code === 'Backspace' || code === 'Escape' || code === 'BrowserBack'
         || code === 'Back' || code === 'GoBack' || kc === 4 || kc === 27) {
-      // DEBUG exit arm (odk-b4): while armed, BACK is never
-      // consumed, so daemon-sent BACKs can walk the host exit.
-      if (Date.now() < (this._exitArmUntil || 0)) return;
       if (Date.now() - this._lastReloadAt < 3000
           || Date.now() - this._lastInteractAt < 3000) return;
       event.preventDefault();
