@@ -3,9 +3,10 @@
 Combined going-out agent for Rokid Glasses: zaisen (Keihan train
 positions) + rain radar in one page, built 2026-11-17 at the
 user's request. Voice launch name: "odekake".
-Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.9;
-package 39389b0b6c2647648ca84645f2aa0cae-1794936550861.aix,
-38.31 KB, odk-b9; device-verified by the user 2026-11-18).
+Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.10;
+package 39389b0b6c2647648ca84645f2aa0cae-1795161534602.aix,
+39.16 KB, odk-b10; device check pending — b9 was
+user-verified 2026-11-18).
 
 ## Modes
 
@@ -30,7 +31,10 @@ reloads the current mode).
 
 ## Build / maintenance
 
-- Current build: **odk-b10** (assembled from zai-b42 + rdr-b12).
+- Current build: **odk-b11** (assembled from zai-b42 + rdr-b12).
+  odk-b11 (2026-11-20, ring-memo request): the swipe-pair
+  window is 800 ms (was 1.5 s in odk-b10, which never
+  reached the device).
   Combo scroll + swipe-pair mode switch (odk-b10, user
   requests 2026-11-18, built 2026-11-20): one combo swipe
   scrolls 169 px (half the 338 px view); the maximum is
@@ -38,12 +42,12 @@ reloads the current mode).
   measured in syncDisplay (estRows estimates wrapped
   rows), so the radar image's bottom never scrolls above
   the screen bottom. In every mode, an opposite-direction
-  swipe within 1.5 s of the previous one performs both
+  swipe within 0.8 s of the previous one performs both
   swipes' own actions (the display returns to its prior
   state) and then switches mode: down-first pair = next,
   up-first pair = previous (noteSwipe in the shell; a
   tap or any mode switch clears the pending first
-  swipe). The 1.5 s pair cannot be driven through the
+  swipe). The 0.8 s pair cannot be driven through the
   bridge daemon (~5 s cadence) — wearer check only.
   Footer restoration (odk-b9, porting zai-b42): the footer
   sits in the .foot element (15px, dim) in combo and zaisen
@@ -60,7 +64,7 @@ reloads the current mode).
   in odk-b10 (2026-11-20) with the user's precise spec:
   (1) combo scroll ~half a screen per swipe with a
   content-end clamp; (2) mode switch by an OPPOSITE-
-  direction swipe pair within 1.5 s (both actions stand,
+  direction swipe pair within 0.8 s (both actions stand,
   then the mode switches; first direction picks next /
   previous) — not the same-direction double swipe first
   imagined here.

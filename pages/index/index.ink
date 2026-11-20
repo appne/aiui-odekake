@@ -253,7 +253,7 @@ for (let si = 0; si < STATIONS.length; si++) STATION_IDX[STATIONS[si][0]] = si;
 
 export default {
   data: {
-    build: 'odk-b10',
+    build: 'odk-b11',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
@@ -1625,7 +1625,7 @@ export default {
   },
   // Opposite-swipe pair (odk-b10, user spec): when a
   // swipe in the opposite direction follows within
-  // 1.5 s, both swipes' own actions stand (the display
+  // 0.8 s, both swipes' own actions stand (the display
   // returns to its prior state) and the mode then
   // switches — the pair's FIRST direction picks the way:
   // down-first (down,up) = next mode, up-first (up,down)
@@ -1636,7 +1636,7 @@ export default {
     const now = Date.now();
     const prev = this._swipePair;
     this._swipePair = { down, at: now };
-    if (prev && prev.down !== down && now - prev.at <= 1500) {
+    if (prev && prev.down !== down && now - prev.at <= 800) {
       this._swipePair = null;
       this.switchMode(prev.down ? 1 : -1);
     }
@@ -1895,7 +1895,7 @@ export default {
       else if (this._oMode === 'zaisen') this.zMove(down ? 1 : -1);
       else this.rStepTime(down ? -1 : 1);
       this.syncDisplay();
-      // An opposite swipe within 1.5 s switches the mode
+      // An opposite swipe within 0.8 s switches the mode
       // after both actions have been applied (odk-b10).
       this.noteSwipe(down);
     }
