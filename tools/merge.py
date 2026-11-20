@@ -306,11 +306,11 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 // scroll APIs exist, and arrow keys never scroll the inner
 // view). A mode switch resets the scroll position (radar
 // mode scrolls straight to its status/hint/image block).
-// The zaisen footer rides in the line flow (zai-b41).
+// The zaisen footer sits in the .foot element (zai-b42).
 """
 
 SHELL_FIELDS = """  data: {
-    build: 'odk-b9',
+    build: 'odk-b10',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
@@ -331,6 +331,7 @@ SHELL_FIELDS = """  data: {
   _tapLockUntil: 0,
   _lastTapAt: 0,
   _tapSnap: null,
+  _swipePair: null,
   _lastReloadAt: 0,
   _lastInteractAt: 0,
   // Scroll position of the page's <scroll-view>. syncDisplay
@@ -342,6 +343,9 @@ SHELL_FIELDS = """  data: {
   // 19+3 = 22.
   svTopVal: 0,
   RADAR_TOP: 22,
+  // Furthest the combo column may scroll (content height
+  // minus the 338 px view), recomputed by syncDisplay.
+  comboMaxScroll: 0,
   cFIdx: 0,
   rLastReqAtS: 0,
   // ---- display buffers (engines write, syncDisplay reads) ----
@@ -409,6 +413,24 @@ SHELL_METHODS = """  // ---- odekake shell ----
       patch.status = this.rComboStatusText;
       patch.hint = 'タップ: 予測 / タップ→スワイプ: モード切替';
       patch.imgSrc = this.rComboImgSrc;
+      // odk-b10: measure the composed column so stepScroll
+      // can clamp at the content end — the bottom of the
+      // radar image must never scroll above the bottom of
+      // the screen. Heights: head 19+3, line 20/row, foot
+      // 17/row + 3 margin, status 22, hint 16, image
+      // 286 + 8 margin. Wrapped rows are estimated from
+      // character widths (full-width = font size,
+      // half-width = ~0.55x).
+      let hgt = 22 + 22 + 16 + (patch.imgSrc ? 294 : 0);
+      for (let k = 0; k < 14; k++) if (patch['L' + k]) hgt += 20 * this.estRows(patch['L' + k], 19);
+      if (patch.foot) hgt += 3 + 17 * this.estRows(patch.foot, 15);
+      this.comboMaxScroll = Math.max(0, hgt - 338);
+      // If the content shrank under the current position,
+      // pull the view back to the end.
+      if (this.svTopVal > this.comboMaxScroll) {
+        this.svTopVal = this.comboMaxScroll;
+        patch.svTop = this.svTopVal;
+      }
     }
     // odk-b8: collapse every '' slot (and an '' foot) so its
     // retained height cannot push the blocks below it down.
@@ -418,14 +440,42 @@ SHELL_METHODS = """  // ---- odekake shell ----
     patch.footc = patch.foot ? 'foot' : 'foot gone';
     this.setData(patch);
   },
-  // Combo scrolling: step the scroll-view by 3 lines per
-  // swipe, clamped to the combo column's rough extent.
+  // Rough wrapped-row count for a text at a given font
+  // size in the 448 px column (odk-b10, for the combo
+  // scroll measurement).
+  estRows(text, fontPx) {
+    let w = 0;
+    for (let i = 0; i < text.length; i++) w += text.charCodeAt(i) > 0xFF ? fontPx : fontPx * 0.55;
+    return Math.max(1, Math.ceil(w / 448));
+  },
+  // Combo scrolling (odk-b10): one swipe scrolls about
+  // half the view (169 px of the 338 px scroll-view),
+  // clamped to the measured content end so the display
+  // never scrolls past its bottom.
   stepScroll(down) {
-    let v = this.svTopVal + (down ? 63 : -63);
+    let v = this.svTopVal + (down ? 169 : -169);
     if (v < 0) v = 0;
-    if (v > 320) v = 320;
+    if (v > this.comboMaxScroll) v = this.comboMaxScroll;
     this.svTopVal = v;
     this.setData({ svTop: v });
+  },
+  // Opposite-swipe pair (odk-b10, user spec): when a
+  // swipe in the opposite direction follows within
+  // 1.5 s, both swipes' own actions stand (the display
+  // returns to its prior state) and the mode then
+  // switches — the pair's FIRST direction picks the way:
+  // down-first (down,up) = next mode, up-first (up,down)
+  // = previous mode, same as the tap->swipe rule. Called
+  // after the swipe's own action has been applied. Any
+  // tap or mode switch clears the pending first swipe.
+  noteSwipe(down) {
+    const now = Date.now();
+    const prev = this._swipePair;
+    this._swipePair = { down, at: now };
+    if (prev && prev.down !== down && now - prev.at <= 1500) {
+      this._swipePair = null;
+      this.switchMode(prev.down ? 1 : -1);
+    }
   },
   rChanged() {
     this.rComboView();
@@ -472,6 +522,7 @@ SHELL_METHODS = """  // ---- odekake shell ----
     this._tapLockUntil = Date.now() + 700;
     this._lastInteractAt = Date.now();
     this._lastTapAt = Date.now();
+    this._swipePair = null;
     if (this._oMode === 'combo') {
       this._tapSnap = { kind: 'combo', cf: this.cFIdx };
       const n = this.rComboFrames().length;
@@ -505,6 +556,7 @@ SHELL_METHODS = """  // ---- odekake shell ----
     }
   },
   switchMode(dir) {
+    this._swipePair = null;
     const order = ['combo', 'zaisen', 'radar'];
     let i = order.indexOf(this._oMode);
     i = (i + dir + order.length) % order.length;
@@ -675,10 +727,13 @@ SHELL_METHODS = """  // ---- odekake shell ----
       this._lastInteractAt = Date.now();
       this.clearTapArm();
       event.preventDefault();
-      if (this._oMode === 'combo') { this.stepScroll(down); return; }
-      if (this._oMode === 'zaisen') this.zMove(down ? 1 : -1);
+      if (this._oMode === 'combo') this.stepScroll(down);
+      else if (this._oMode === 'zaisen') this.zMove(down ? 1 : -1);
       else this.rStepTime(down ? -1 : 1);
       this.syncDisplay();
+      // An opposite swipe within 1.5 s switches the mode
+      // after both actions have been applied (odk-b10).
+      this.noteSwipe(down);
     }
   }
 """
