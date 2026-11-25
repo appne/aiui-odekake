@@ -310,7 +310,7 @@ HEADER = """// odekake (おでかけ): zaisen + rain radar in one agent, for
 """
 
 SHELL_FIELDS = """  data: {
-    build: 'odk-b11',
+    build: 'odk-b12',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',

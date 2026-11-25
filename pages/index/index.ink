@@ -141,9 +141,14 @@
 // skipped when the previous reload started less than 10 seconds
 // ago (RELOAD_GUARD_MS; zFetchData used to carry a 2-second guard).
 // (B) After a position-load failure, one extra reload is
-// scheduled 30 seconds later (RETRY_MS) instead of waiting for
-// the next 90-second tick; the retry chains while loads keep
-// failing and is cancelled by the next success.
+// scheduled RETRY_MS later instead of waiting for the next
+// 90-second tick; the retry chains while loads keep failing
+// and is cancelled by the next success.
+// zai-b43: RETRY_MS shortened 30 s -> 10 s, at the user's
+// request (ring memo, 2026-11-25: "on load failure, reload
+// after 10 seconds"). The 10 s reload guard cannot swallow
+// the retry: it is scheduled from the failure callback, so it
+// fires at least RETRY_MS after the failed fetch started.
 // zai-b36: a stopped train is also shown as an overtake wait
 // ([[...]]) when another train in the same direction has an
 // earlier countdown at that station (zIsCountdownOvertake) — e.g.
@@ -218,7 +223,7 @@ const URL_TT = 'https://www.keihan.co.jp/zaisen-up/startTimeList.json';
 // regenerated roughly once a minute (measured gaps of 60-71 s, not
 // published), so 90 s stays clear of hammering it while missing little.
 const RELOAD_MS = 90 * 1000;
-const RETRY_MS = 30 * 1000;
+const RETRY_MS = 10 * 1000;
 const RELOAD_GUARD_MS = 10 * 1000;
 const RELOAD_WINDOW_MS = 10 * 60 * 1000;
 const RELOAD_MARKS = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
@@ -253,7 +258,7 @@ for (let si = 0; si < STATIONS.length; si++) STATION_IDX[STATIONS[si][0]] = si;
 
 export default {
   data: {
-    build: 'odk-b11',
+    build: 'odk-b12',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',

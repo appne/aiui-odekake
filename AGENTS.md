@@ -3,10 +3,10 @@
 Combined going-out agent for Rokid Glasses: zaisen (Keihan train
 positions) + rain radar in one page, built 2026-11-17 at the
 user's request. Voice launch name: "odekake".
-Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.10;
-package 39389b0b6c2647648ca84645f2aa0cae-1795161534602.aix,
-39.16 KB, odk-b10; device check pending — b9 was
-user-verified 2026-11-18).
+Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.11;
+package 39389b0b6c2647648ca84645f2aa0cae-1795174086703.aix,
+39.15 KB, odk-b11; user-verified OK 2026-11-20 —
+"いい感じ", will use it for a while).
 
 ## Modes
 
@@ -31,7 +31,10 @@ reloads the current mode).
 
 ## Build / maintenance
 
-- Current build: **odk-b11** (assembled from zai-b42 + rdr-b12).
+- Current build: **odk-b12** (assembled from zai-b43 + rdr-b12).
+  odk-b12 (2026-11-25): port of zai-b43 — the zaisen engine's
+  load-failure retry is 10 s (was 30 s), per the user's
+  ring-memo request.
   odk-b11 (2026-11-20, ring-memo request): the swipe-pair
   window is 800 ms (was 1.5 s in odk-b10, which never
   reached the device).
