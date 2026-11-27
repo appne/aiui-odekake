@@ -3,9 +3,11 @@
 Combined going-out agent for Rokid Glasses: zaisen (Keihan train
 positions) + rain radar in one page, built 2026-11-17 at the
 user's request. Voice launch name: "odekake".
-Agent ID: 39389b0b6c2647648ca84645f2aa0cae (odk-b13;
-Studio Version / package updated after the repackage.
-odk-b12: Studio Version 1.0.12, package
+Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.13;
+package 39389b0b6c2647648ca84645f2aa0cae-1795747416171.aix,
+39.16 KB, odk-b13; Studio update done 2026-11-27,
+on-device build number not yet verified. odk-b12:
+Studio Version 1.0.12, package
 39389b0b6c2647648ca84645f2aa0cae-1795612232245.aix,
 39.25 KB; build number verified on device
 2026-11-25, behaviour to be confirmed in use. odk-b11 was
