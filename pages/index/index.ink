@@ -6,19 +6,17 @@
 <script setup>
 // odekake (おでかけ): zaisen + rain radar in one agent, for
 // going-out checks (user request 2026-11-17). Three display
-// modes, switched by a tap followed within 3 s by a swipe:
+// modes, switched by an opposite-direction swipe pair within
+// 0.8 s (odk-b10/b11; the tap -> swipe switch was removed in
+// odk-b13 at the user's request):
 //   combo  (default): zaisen 'single' lines on top, the radar
 //          wide view below (home/here auto-switch as in radar);
 //          overflow scrolls with swipes (the shell steps the
 //          scroll-view's scroll-top). Tap cycles the radar
 //          forecast 現在 -> +5 -> +10 -> +30 (no +60 here);
 //          BACK reloads both.
-//   zaisen: the zaisen agent (zai-b41) as-is.
-//   radar:  the radar agent (rdr-b12) as-is.
-// A tap applies its mode-local action at once; if a swipe
-// follows within 3 s, the tap's effect is reverted and the
-// swipe switches the odekake mode instead (down = next,
-// up = previous, wrapping combo -> zaisen -> radar -> combo).
+//   zaisen: the zaisen agent as-is.
+//   radar:  the radar agent as-is.
 // The mode switched TO keeps its previous display state.
 // BACK follows the zai-b40 / rdr-b12 rule in every mode: a
 // press within 3 s of the last reload or of the last tap/swipe
@@ -149,6 +147,11 @@
 // after 10 seconds"). The 10 s reload guard cannot swallow
 // the retry: it is scheduled from the failure callback, so it
 // fires at least RETRY_MS after the failed fetch started.
+// zai-b44: a BACK reload also re-checks the current location
+// (user request 2026-11-27): zProbeLocation(true) recentres
+// on the nearest station when it changed, even after manual
+// scrolling. The 90 s auto-reload ticks and the failure
+// retry do NOT probe location.
 // zai-b36: a stopped train is also shown as an overtake wait
 // ([[...]]) when another train in the same direction has an
 // earlier countdown at that station (zIsCountdownOvertake) — e.g.
@@ -258,7 +261,7 @@ for (let si = 0; si < STATIONS.length; si++) STATION_IDX[STATIONS[si][0]] = si;
 
 export default {
   data: {
-    build: 'odk-b12',
+    build: 'odk-b13',
     head: 'おでかけ 読込中…',
     L0: '', L1: '', L2: '', L3: '', L4: '', L5: '', L6: '', L7: '',
     L8: '', L9: '', L10: '', L11: '', L12: '', L13: '',
@@ -277,8 +280,6 @@ export default {
   _oMode: 'combo',
   _tapTimer: null,
   _tapLockUntil: 0,
-  _lastTapAt: 0,
-  _tapSnap: null,
   _swipePair: null,
   _lastReloadAt: 0,
   _lastInteractAt: 0,
@@ -295,6 +296,9 @@ export default {
   // minus the 338 px view), recomputed by syncDisplay.
   comboMaxScroll: 0,
   cFIdx: 0,
+  // odk-b13: until the wearer taps, the combo radar starts
+  // on the +10 min forecast (same default as rdr-b13).
+  _cDefPending: true,
   rLastReqAtS: 0,
   // ---- display buffers (engines write, syncDisplay reads) ----
   zCenter: 4,
@@ -429,13 +433,18 @@ export default {
     }
     this.zFetchData();
   },
-  zProbeLocation() {
+  zProbeLocation(recenter) {
     const apply = (lat, lon) => {
       const idx = this.zNearestStation(lat, lon);
       this.zFootText = 'loc OK ' + STATIONS[idx][0] + ' ' + lat.toFixed(3) + ',' + lon.toFixed(3); this.syncDisplay();
       // Centre on the nearest station, unless the user has
-      // already scrolled away from the initial view.
-      if (!this.zUserMoved && idx !== this.zCenter) {
+      // already scrolled away from the initial view. A BACK
+      // reload passes recenter=true (zai-b44): then a changed
+      // nearest station recentres even after manual scrolling,
+      // and the manual-scroll state resets — the view is
+      // location-anchored again.
+      if ((recenter || !this.zUserMoved) && idx !== this.zCenter) {
+        if (recenter) this.zUserMoved = false;
         this.zCenter = idx;
         this.zRender();
       }
@@ -1188,6 +1197,11 @@ export default {
     this.zRender();
   },
   // ---- radar engine (rdr-b12, prefixed r*) ----
+// rdr-b13: the startup default frame is the +10 min forecast
+// (user request 2026-11-27, radar + odekake). _defPending is
+// armed at open and by reload() (a reload re-runs the open
+// sequence); the first frames to land select off === 10 via
+// applyDefaultFrame. A manual time step disarms it.
 // rdr-b11: a third here-mode view, 詳細 (detail): the current
 // location at 1.5x the near zoom (user request 2026-11-14).
 // The here cycle is now here -> widehere -> detail -> here.
@@ -1276,6 +1290,7 @@ export default {
   rMode: 'home',
   rView: 0,
   rFIdx: 0,
+  rDefPending: true,
   rFrames: [{ off: 0, vt: '', display: '' }],
   rPollTimer: null,
   rPollLeft: 0,
@@ -1350,6 +1365,7 @@ export default {
             if (mode === this.rMode) {
               this.rFrames = m.frames;
               if (this.rFIdx >= this.rFrames.length) this.rFIdx = this.rFrames.length - 1;
+              this.rApplyDefaultFrame();
             }
           }
           if (cb) cb(m);
@@ -1357,6 +1373,20 @@ export default {
         fail: () => { if (cb) cb(null); }
       });
     } catch (e) { if (cb) cb(null); }
+  },
+  // rdr-b13: while rDefPending is armed, select the +10 min
+  // forecast frame as the default display. Disarms once a
+  // +10 frame exists in the landed frames; frames without a
+  // +10 entry leave it armed for the next landing.
+  rApplyDefaultFrame() {
+    if (!this.rDefPending) return;
+    for (let i = 0; i < this.rFrames.length; i++) {
+      if (this.rFrames[i].off === 10) {
+        this.rFIdx = i;
+        this.rDefPending = false;
+        return;
+      }
+    }
   },
   rStartHere() {
     let geo = null;
@@ -1445,6 +1475,7 @@ export default {
             if (!wasHere) this.rView = 0;
             if (this.rFIdx >= m.frames.length) this.rFIdx = 0;
             this.rFrames = m.frames;
+            this.rApplyDefaultFrame();
             this.rHereReady = true;
             this.rHintText = 'タップ: 切替 / スワイプ: 時刻 / バック: 再読込'; this.rChanged();
             this.rApplyView();
@@ -1505,6 +1536,7 @@ export default {
     this.rMode = 'home';
     this.rView = 0;
     this.rFIdx = 0;
+    this.rDefPending = true;
     this.rFrames = [{ off: 0, vt: '', display: '' }];
     this.rPaintedVt = '';
     this.rHomeReady = false;
@@ -1527,6 +1559,7 @@ export default {
     this.rApplyView();
   },
   rStepTime(dir) {
+    this.rDefPending = false;
     const n = this.rFIdx + dir;
     if (n < 0 || n >= this.rFrames.length) return;
     this.rFIdx = n;
@@ -1580,7 +1613,7 @@ export default {
       for (let k = 0; k < 14 && k < rs.lines.length; k++) patch['L' + k] = rs.lines[k];
       patch.foot = footText;
       patch.status = this.rComboStatusText;
-      patch.hint = 'タップ: 予測 / タップ→スワイプ: モード切替';
+      patch.hint = 'タップ: 予測 / 往復スワイプ: モード切替';
       patch.imgSrc = this.rComboImgSrc;
       // odk-b10: measure the composed column so stepScroll
       // can clamp at the content end — the bottom of the
@@ -1634,9 +1667,11 @@ export default {
   // returns to its prior state) and the mode then
   // switches — the pair's FIRST direction picks the way:
   // down-first (down,up) = next mode, up-first (up,down)
-  // = previous mode, same as the tap->swipe rule. Called
-  // after the swipe's own action has been applied. Any
-  // tap or mode switch clears the pending first swipe.
+  // = previous mode. Called after the swipe's own action
+  // has been applied. Any tap or mode switch clears the
+  // pending first swipe. (Since odk-b13 this pair is the
+  // only gesture mode switch; the tap -> swipe switch
+  // was removed at the user's request.)
   noteSwipe(down) {
     const now = Date.now();
     const prev = this._swipePair;
@@ -1664,6 +1699,12 @@ export default {
     const frames = this.rComboFrames();
     if (this.cFIdx >= frames.length) this.cFIdx = frames.length - 1;
     if (this.cFIdx < 0) this.cFIdx = 0;
+    // odk-b13: the startup (and BACK-reload) default is the
+    // +10 forecast, until the wearer taps through the cycle.
+    if (this._cDefPending) {
+      const di = frames.findIndex(f => f.off === 10);
+      if (di >= 0) { this.cFIdx = di; this._cDefPending = false; }
+    }
     const f = frames[this.cFIdx] || frames[0] || { off: 0, vt: '', display: '' };
     const ready = this.rMode === 'home' ? this.rHomeReady : this.rHereReady;
     if (!ready) {
@@ -1685,44 +1726,27 @@ export default {
   },
   // One physical tap, detected as in radar (GlobalHook arm +
   // Enter confirm, 700 ms lockout). The tap applies its
-  // mode-local action immediately and snapshots the pre-tap
-  // state; a swipe within 3 s reverts it (see onKeyUp).
+  // mode-local action immediately. (Until odk-b12 a swipe
+  // within 3 s reverted the tap and switched mode instead;
+  // odk-b13 removed that at the user's request — the
+  // opposite-swipe pair is the only gesture mode switch.)
   fireTap() {
     this._tapLockUntil = Date.now() + 700;
     this._lastInteractAt = Date.now();
-    this._lastTapAt = Date.now();
     this._swipePair = null;
     if (this._oMode === 'combo') {
-      this._tapSnap = { kind: 'combo', cf: this.cFIdx };
+      this._cDefPending = false;
       const n = this.rComboFrames().length;
       if (n > 0) this.cFIdx = (this.cFIdx + 1) % n;
       this.rComboView();
     } else if (this._oMode === 'zaisen') {
-      this._tapSnap = { kind: 'zaisen', zm: this.zMode };
       this.zMode = this.zMode === 'single' ? 'focus' : this.zMode === 'focus' ? 'omit' : this.zMode === 'omit' ? 'all' : 'single';
       this.zApplyHead();
       this.zRender();
     } else {
-      this._tapSnap = { kind: 'radar', rv: this.rView };
       this.rCycleView();
     }
     this.syncDisplay();
-  },
-  revertTap() {
-    const s = this._tapSnap;
-    if (!s) return;
-    this._tapSnap = null;
-    if (s.kind === 'combo') {
-      this.cFIdx = s.cf;
-      this.rComboView();
-    } else if (s.kind === 'zaisen') {
-      this.zMode = s.zm;
-      this.zApplyHead();
-      this.zRender();
-    } else {
-      this.rView = s.rv;
-      this.rApplyView();
-    }
   },
   switchMode(dir) {
     this._swipePair = null;
@@ -1777,8 +1801,8 @@ export default {
     }
   },
   // DEBUG drive (user suggestion 2026-11-17): the daemon's
-  // send_key cadence (~5 s per token) cannot fit the 3 s
-  // tap->swipe window, so development verification drives
+  // send_key cadence (~5 s per token) cannot fit the 0.8 s
+  // swipe-pair window, so development verification drives
   // mode switches with a dedicated key. Measured facts
   // (kensho vrf-b34 keylog, 2026-11-18): ink key events
   // carry ONLY `code` (key / keyCode are always undefined);
@@ -1804,7 +1828,6 @@ export default {
     }
     if (code === 'Shortcut') {
       this._lastInteractAt = Date.now();
-      this._tapSnap = null;
       this.clearTapArm();
       this.switchMode(1);
     }
@@ -1820,7 +1843,6 @@ export default {
     if (code === 'KeyA' || key === 'a' || kc === 65) {
       event.preventDefault();
       this._lastInteractAt = Date.now();
-      this._tapSnap = null;
       this.clearTapArm();
       this.switchMode(1);
       return;
@@ -1828,7 +1850,6 @@ export default {
     if (code === 'KeyS' || key === 's') {
       event.preventDefault();
       this._lastInteractAt = Date.now();
-      this._tapSnap = null;
       this.clearTapArm();
       this.switchMode(-1);
       return;
@@ -1843,15 +1864,18 @@ export default {
           || Date.now() - this._lastInteractAt < 3000) return;
       event.preventDefault();
       this._lastReloadAt = Date.now();
-      this._tapSnap = null;
       if (this._oMode === 'combo') {
         this.zStartAutoReload();
         this.zFetchData();
+        // zai-b44 port: a BACK reload re-checks location.
+        this.zProbeLocation(true);
         this.zRender();
+        this._cDefPending = true;
         this.rReload();
       } else if (this._oMode === 'zaisen') {
         this.zStartAutoReload();
         this.zFetchData();
+        this.zProbeLocation(true);
         this.zRender();
       } else {
         this.rReload();
@@ -1882,17 +1906,6 @@ export default {
     }
     if (code === 'ArrowUp' || code === 'ArrowDown') {
       const down = code === 'ArrowDown';
-      // Mode switch: a swipe within 3 s of a tap reverts the
-      // tap and switches the odekake mode (down = next,
-      // up = previous, wrapping).
-      if (this._tapSnap && Date.now() - this._lastTapAt <= 3000) {
-        event.preventDefault();
-        this.clearTapArm();
-        this._lastInteractAt = Date.now();
-        this.revertTap();
-        this.switchMode(down ? 1 : -1);
-        return;
-      }
       this._lastInteractAt = Date.now();
       this.clearTapArm();
       event.preventDefault();

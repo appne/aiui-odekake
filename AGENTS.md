@@ -3,9 +3,13 @@
 Combined going-out agent for Rokid Glasses: zaisen (Keihan train
 positions) + rain radar in one page, built 2026-11-17 at the
 user's request. Voice launch name: "odekake".
-Agent ID: 39389b0b6c2647648ca84645f2aa0cae (Studio Version 1.0.11;
-package 39389b0b6c2647648ca84645f2aa0cae-1795174086703.aix,
-39.15 KB, odk-b11; user-verified OK 2026-11-20 —
+Agent ID: 39389b0b6c2647648ca84645f2aa0cae (odk-b13;
+Studio Version / package updated after the repackage.
+odk-b12: Studio Version 1.0.12, package
+39389b0b6c2647648ca84645f2aa0cae-1795612232245.aix,
+39.25 KB; build number verified on device
+2026-11-25, behaviour to be confirmed in use. odk-b11 was
+user-verified OK 2026-11-20 —
 "いい感じ", will use it for a while).
 
 ## Modes
@@ -17,13 +21,16 @@ package 39389b0b6c2647648ca84645f2aa0cae-1795174086703.aix,
 - **zaisen**: the zaisen agent as-is.
 - **radar**: the radar agent as-is.
 
-Mode switch: tap, then a swipe within 3 s. NOTE (wearer-
-confirmed 2026-11-17): the R08 bridge consumes a swipe that
-lands within ~700 ms of the tap as a tap+swipe combo gesture,
-so the swipe must come after a short breath (~1 s works);
-this is structural, not a page bug. The tap's effect is
-reverted, then the mode switches (down swipe = next, up =
-previous, wrapping combo -> zaisen -> radar -> combo). The mode
+Mode switch: an opposite-direction swipe pair within
+0.8 s (odk-b10/b11; down-first = next, up-first =
+previous, wrapping combo -> zaisen -> radar -> combo).
+Until odk-b12 a tap followed within 3 s by a swipe also
+switched (the tap's effect was reverted first; wearer
+note from 2026-11-17: the R08 bridge consumes a swipe
+that lands within ~700 ms of the tap as a tap+swipe
+combo gesture, so the swipe had to come after a short
+breath); odk-b13 removed the tap -> swipe switch at the
+user's request (2026-11-27). The mode
 switched to keeps its previous display state. BACK follows the
 zai-b40 / rdr-b12 rule in every mode (within 3 s of the last
 reload / tap / swipe it passes through to exit; otherwise it
@@ -31,7 +38,18 @@ reloads the current mode).
 
 ## Build / maintenance
 
-- Current build: **odk-b12** (assembled from zai-b43 + rdr-b12).
+- Current build: **odk-b13** (assembled from zai-b44 + rdr-b13).
+  odk-b13 (2026-11-27, user requests): (1) the tap ->
+  swipe mode switch is removed (fireTap no longer
+  snapshots, revertTap is gone); the opposite-swipe pair
+  is the only gesture mode switch. (2) The radar default
+  frame at startup is +10 min: the rdr-b13 engine default
+  (rDefPending) covers radar mode, and the shell's
+  _cDefPending does the same for the combo forecast;
+  both re-arm on a BACK reload, a combo tap disarms the
+  combo one. (3) Port of zai-b44: a BACK reload in combo
+  and zaisen modes also calls zProbeLocation(true), so
+  the zaisen centre follows the wearer's nearest station.
   odk-b12 (2026-11-25): port of zai-b43 — the zaisen engine's
   load-failure retry is 10 s (was 30 s), per the user's
   ring-memo request.
